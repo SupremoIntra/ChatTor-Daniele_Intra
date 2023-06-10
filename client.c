@@ -1,69 +1,105 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
+#include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <pthread.h>
 
-void * doRecieving(void * sockID){
+#define SERVER_IP "127.0.0.1"
+#define SERVER_PORT 8888
+#define BUFFER_SIZE 1024
 
-	int clientSocket = *((int *) sockID);
+int client_socket;
+pthread_t receive_thread;
 
-	while(1){
+void *receive_messages(void *arg) {
+    char buffer[BUFFER_SIZE];
+    ssize_t num_bytes;
 
-		char data[1024];
-		int read = recv(clientSocket,data,1024,0);
-		data[read] = '\0';
-		printf("%s\n",data);
+    while (1) {
+        memset(buffer, 0, sizeof(buffer));
+        num_bytes = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+        if (num_bytes <= 0) {
+            break;
+        } else {
+            printf("%s\n", buffer);
+        }
+    }
 
-	}
-
+    printf("Connessione al server terminata.\n");
+    pthread_exit(NULL);
 }
 
-int main(){
+int main() {
+    struct sockaddr_in server_addr;
+    char buffer[BUFFER_SIZE];
+    char client_name[BUFFER_SIZE];
 
-	int clientSocket = socket(PF_INET, SOCK_STREAM, 0);
+    // Creazione del socket del client
+    if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Errore nella creazione del socket");
+        exit(EXIT_FAILURE);
+    }
 
-	struct sockaddr_in serverAddr;
+    // Impostazione dell'indirizzo del server
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(SERVER_PORT);
 
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(8080);
-	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (inet_pton(AF_INET, SERVER_IP, &(server_addr.sin_addr)) <= 0) {
+        perror("Errore nell'indirizzo del server");
+        exit(EXIT_FAILURE);
+    }
 
-	if(connect(clientSocket, (struct sockaddr*) &serverAddr, sizeof(serverAddr)) == -1) return 0;
+    // Connessione al server
+    if (connect(client_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+        perror("Errore nella connessione al server");
+        exit(EXIT_FAILURE);
+    }
 
-	printf("Connection established ............\n");
+    printf("Connessione al server %s:%d avvenuta con successo.\n", SERVER_IP, SERVER_PORT);
 
-	pthread_t thread;
-	pthread_create(&thread, NULL, doRecieving, (void *) &clientSocket );
+    // Inserimento del nome del client
+    printf("Inserisci il tuo nome: ");
+    fgets(client_name, sizeof(client_name), stdin);
+    client_name[strcspn(client_name, "\n")] = '\0';
 
-	while(1){
+    // Invio del nome del client al server
+    if (send(client_socket, client_name, strlen(client_name), 0) < 0) {
+        perror("Errore nell'invio del nome del client");
+        close(client_socket);
+        exit(EXIT_FAILURE);
+    }
 
-		char input[1024];
-		scanf("%s",input);
+    // Creazione del thread per la ricezione dei messaggi
+    if (pthread_create(&receive_thread, NULL, receive_messages, NULL) != 0) {
+        perror("Errore nella creazione del thread");
+        close(client_socket);
+        exit(EXIT_FAILURE);
+    }
 
-		if(strcmp(input,"LIST") == 0){
+    // Ciclo di input dei messaggi
+    while (1) {
+        fgets(buffer, sizeof(buffer), stdin);
+        buffer[strcspn(buffer, "\n")] = '\0';
 
-			send(clientSocket,input,1024,0);
+        // Invio del messaggio al server
+        if (send(client_socket, buffer, strlen(buffer), 0) < 0) {
+            perror("Errore nell'invio del messaggio");
+            break;
+        }
 
-		}
-		if(strcmp(input,"SEND") == 0){
+        if (strcmp(buffer, "exit") == 0) {
+            printf("Disconnessione dal server.\n");
+            break;
+        }
+    }
 
-			send(clientSocket,input,1024,0);
-			
-			scanf("%s",input);
-			send(clientSocket,input,1024,0);
-			
-			scanf("%[^\n]s",input);
-			send(clientSocket,input,1024,0);
+    // Join del thread di ricezione dei messaggi
+    pthread_join(receive_thread, NULL);
 
-		}
+    // Chiusura del socket del client
+    close(client_socket);
 
-	}
-
-
+    return 0;
 }
