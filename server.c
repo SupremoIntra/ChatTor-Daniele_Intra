@@ -13,6 +13,7 @@ int client_sockets[MAX_CLIENTS];
 pthread_t client_threads[MAX_CLIENTS];
 pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
 char client_names[MAX_CLIENTS][BUFFER_SIZE];
+char client_name[BUFFER_SIZE];  // Variabile locale per memorizzare il nome del client
 
 void *handle_client(void *arg) {
     int client_socket = *(int *) arg;
@@ -27,7 +28,13 @@ void *handle_client(void *arg) {
         pthread_exit(NULL);
     }
     buffer[num_bytes] = '\0';
-    strncpy(client_names[client_socket], buffer, sizeof(client_names[client_socket]) - 1);
+    strncpy(client_name, buffer, sizeof(client_name) - 1);
+
+     snprintf(buffer, sizeof(buffer), "Benvenuto, client %s!", client_name);
+        if (send(client_socket, buffer, strlen(buffer), 0) < 0) {
+            perror("Errore nell'invio del messaggio di benvenuto al client");
+            pthread_exit(NULL); //mi puzza
+        }
 
     while (1) {
         memset(buffer, 0, sizeof(buffer));
@@ -35,7 +42,7 @@ void *handle_client(void *arg) {
         if (num_bytes <= 0) {
             break;
         } else {
-            printf("Messaggio ricevuto dal client %s: %s\n", client_names[client_socket], buffer);
+            printf("Messaggio ricevuto dal client %s: %s\n", client_name, buffer);
 
             pthread_mutex_lock(&client_mutex);
             for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -48,6 +55,7 @@ void *handle_client(void *arg) {
                     }
                 }
             }
+
             pthread_mutex_unlock(&client_mutex);
         }
     }
@@ -130,11 +138,6 @@ int main() {
 
         printf("Nuova connessione accettata. Numero di client connessi: %d\n", num_clients);
 
-        // Invio del messaggio di benvenuto al client
-        snprintf(buffer, sizeof(buffer), "Benvenuto, client %d!", num_clients);
-        if (send(client_socket, buffer, strlen(buffer), 0) < 0) {
-            perror("Errore nell'invio del messaggio di benvenuto al client");
-        }
     }
 
     return 0;
