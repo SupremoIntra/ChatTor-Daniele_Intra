@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <curl/curl.h>
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8888
@@ -32,10 +33,39 @@ void *receive_messages(void *arg) {
     return 0;
 }
 
+      
+void check_ip() {
+
+    CURL *curl;
+    CURLcode res;
+    char *url = "https://api.ipify.org/?format=json"; // Un servizio per ottenere l'IP pubblico
+
+    // Inizializza libcurl
+    curl = curl_easy_init();
+    if (!curl) {
+        fprintf(stderr, "Errore nell'inizializzazione di libcurl\n");
+    }
+
+    // Configura l'URL di destinazione
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+
+    // Esegui la richiesta HTTP
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK) {
+        fprintf(stderr, "Errore nella richiesta HTTP: %s\n", curl_easy_strerror(res));
+        curl_easy_cleanup(curl);
+    }
+
+    // Chiudi la connessione HTTP
+    curl_easy_cleanup(curl);
+}
+
 int main() {
     struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE];
     char client_name[BUFFER_SIZE];
+
+    check_ip();
 
     // Creazione del socket del client
     if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -58,7 +88,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Connessione al server %s:%d avvenuta con successo.\n", SERVER_IP, SERVER_PORT);
+    printf("\nConnessione al server %s:%d avvenuta con successo.\n", SERVER_IP, SERVER_PORT);
 
     // Inserimento del nome del client
     printf("Inserisci il tuo nome: ");
