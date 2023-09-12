@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <curl/curl.h>
 
-#define SERVER_IP "93.51.120.158"
+#define SERVER_IP "QUA DEVI INSERIRE L'IP PUBBLICO"
 #define SERVER_PORT 8888
 #define BUFFER_SIZE 1024
 
