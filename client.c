@@ -29,6 +29,7 @@ void *receive_messages(void *arg) {
 
     printf("Connessione al server terminata.\n");
     pthread_exit(NULL);
+    return 0;
 }
 
 int main() {
@@ -83,16 +84,22 @@ int main() {
         fgets(buffer, sizeof(buffer), stdin);
         buffer[strcspn(buffer, "\n")] = '\0';
 
+        if (strcmp(buffer, "exit") == 0) {
+            printf("Disconnessione dal server.\n");
+
+            if (send(client_socket, "Il client ha abbandonato", 30, 0) < 0) {
+            perror("Errore nell'invio del messaggio");
+            break; //non un'implementazione raffinata ma funziona
+        }
+            return 0;
+        }
+
         // Invio del messaggio al server
         if (send(client_socket, buffer, strlen(buffer), 0) < 0) {
             perror("Errore nell'invio del messaggio");
             break;
         }
 
-        if (strcmp(buffer, "exit") == 0) {
-            printf("Disconnessione dal server.\n");
-            break;
-        }
     }
 
     // Join del thread di ricezione dei messaggi
